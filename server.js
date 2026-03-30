@@ -465,7 +465,7 @@ app.post('/api/admin/auth', async (req, res) => {
   if (!valid) return res.status(401).json({ error: 'Unauthorized' });
 
   // Token is HMAC of username+timestamp — stateless, verifiable
-  const token = sha256('admin-session:' + username + ':' + process.env.ADMIN_SECRET || 'samegame-2024');
+  const token = sha256('admin-session:' + username + ':' + (process.env.ADMIN_SECRET || 'samegame-2024'));
   res.json({ ok: true, token });
 });
 
@@ -477,10 +477,6 @@ app.get('/api/admin/stats', requireAdmin, (req, res) => {
   const roomCounts = {};
   PUBLIC_ROOMS.forEach(r => { roomCounts[r] = rooms[r]?.size || 0; });
   res.json({ totalPlayers, totalMessages, onlineCount, roomCounts });
-});
-
-app.get('/cron', (req, res) => {
-  res.status(200).send('OK');
 });
 
 // ── WebSocket ─────────────────────────────────────────────────────────────────
