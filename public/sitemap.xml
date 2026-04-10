@@ -3,6 +3,7 @@
 
   <url>
     <loc>https://samegame-v2.onrender.com/</loc>
+    <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
 
