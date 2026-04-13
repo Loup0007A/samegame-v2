@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Explorateur de Mandelbrot</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #111;
+      color: #eee;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 24px 16px;
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 500;
+      margin-bottom: 16px;
+      letter-spacing: 0.03em;
+      color: #fff;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 14px;
+      width: 100%;
+      max-width: 660px;
+    }
+
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    label { font-size: 13px; color: #aaa; }
+
+    input[type=range] {
+      width: 140px;
+      accent-color: #7a6ff0;
+    }
+
+    .val {
+      font-size: 13px;
+      font-weight: 500;
+      min-width: 32px;
+      color: #fff;
+    }
+
+    select {
+      background: #222;
+      color: #eee;
+      border: 1px solid #444;
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 13px;
+    }
+
+    button {
+      background: transparent;
+      color: #ccc;
+      border: 1px solid #444;
+      border-radius: 6px;
+      padding: 5px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    button:hover { background: #2a2a2a; }
+
+    canvas {
+      border-radius: 10px;
+      border: 1px solid #333;
+      cursor: crosshair;
+      max-width: 100%;
+      display: block;
+    }
+
+    .hint {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 8px;
+    }
+
+    #info {
+      margin-top: 10px;
+      font-size: 12px;
+      font-family: monospace;
+      color: #888;
+    }
+
+    #loading {
+      font-size: 13px;
+      color: #7a6ff0;
+      height: 18px;
+      margin-bottom: 6px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>🔭 Explorateur de Mandelbrot</h1>
+
+<div class="controls">
+  <div class="control-group">
+    <label for="iter">Itérations</label>
+    <input type="range" id="iter" min="20" max="300" value="100" step="10">
+    <span class="val" id="iter-val">100</span>
+  </div>
+  <div class="control-group">
+    <label for="palette">Palette</label>
+    <select id="palette">
+      <option value="fire">Feu</option>
+      <option value="ocean">Océan</option>
+      <option value="neon">Néon</option>
+      <option value="gold">Or</option>
+    </select>
+  </div>
+  <button id="btn-reset">↺ Réinitialiser</button>
+</div>
+
+<div id="loading"></div>
+<div class="hint">Clic gauche → zoomer &nbsp;·&nbsp; Double-clic → dézoomer</div>
+
+<canvas id="canvas"></canvas>
+<div id="info">Centre: (-0.5, 0) · Zoom: ×1</div>
+
+<script>
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const W = 660, H = 440;
+  canvas.width = W;
+  canvas.height = H;
+
+  let state = { cx: -0.5, cy: 0, range: 3.0 };
+
+  // ── Palettes ──────────────────────────────────────────────────────
+  const palettes = {
+    fire: (t) => {
+      return [Math.min(255, t * 3 * 255) | 0, Math.max(0, (t * 2 - 0.5) * 1.5 * 255) | 0, 0];
+    },
+    ocean: (t) => {
+      return [0, (t * 0.7 * 255) | 0, Math.min(255, t * 1.5 * 255) | 0];
+    },
+    neon: (t) => {
+      const h = t * 360, s = 1, l = 0.5;
+      const c = (1 - Math.abs(2 * l - 1)) * s;
+      const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+      const m = l - c / 2;
+      let r = 0, g = 0, b = 0;
+      if      (h < 60)  { r = c; g = x; }
+      else if (h < 120) { r = x; g = c; }
+      else if (h < 180) { g = c; b = x; }
+      else if (h < 240) { g = x; b = c; }
+      else if (h < 300) { r = x; b = c; }
+      else              { r = c; b = x; }
+      return [((r + m) * 255) | 0, ((g + m) * 255) | 0, ((b + m) * 255) | 0];
+    },
+    gold: (t) => {
+      return [Math.min(255, (0.5 + t * 0.5) * 255) | 0, (t * 0.8 * 255) | 0, (t * 0.1 * 255) | 0];
+    }
+  };
+
+  // ── Algorithme Mandelbrot (smooth coloring) ───────────────────────
+  function mandelbrot(cx, cy, maxIter) {
+    let x = 0, y = 0;
+    for (let i = 0; i < maxIter; i++) {
+      if (x * x + y * y > 4) {
+        return i + 1 - Math.log(Math.log(x * x + y * y) / Math.log(2)) / Math.log(2);
+      }
+      [x, y] = [x * x - y * y + cx, 2 * x * y + cy];
+    }
+    return -1;
+  }
+
+  // ── Rendu ─────────────────────────────────────────────────────────
+  function draw() {
+    document.getElementById('loading').textContent = 'Calcul en cours…';
+    setTimeout(() => {
+      const maxIter = parseInt(document.getElementById('iter').value);
+      const palette = palettes[document.getElementById('palette').value];
+      const img = ctx.createImageData(W, H);
+      const d = img.data;
+
+      const xMin  = state.cx - state.range / 2;
+      const yMin  = state.cy - state.range * (H / W) / 2;
+      const xStep = state.range / W;
+      const yStep = state.range * (H / W) / H;
+
+      for (let py = 0; py < H; py++) {
+        const cy_ = yMin + py * yStep;
+        for (let px = 0; px < W; px++) {
+          const cx_ = xMin + px * xStep;
+          const n = mandelbrot(cx_, cy_, maxIter);
+          const i4 = (py * W + px) * 4;
+          if (n < 0) {
+            d[i4] = d[i4+1] = d[i4+2] = 0;
+          } else {
+            const t = Math.pow(n / maxIter, 0.4);
+            const [r, g, b] = palette(t);
+            d[i4] = r; d[i4+1] = g; d[i4+2] = b;
+          }
+          d[i4+3] = 255;
+        }
+      }
+
+      ctx.putImageData(img, 0, 0);
+      document.getElementById('loading').textContent = '';
+      const zoom = (3 / state.range).toFixed(1);
+      document.getElementById('info').textContent =
+        `Centre: (${state.cx.toFixed(5)}, ${state.cy.toFixed(5)})  ·  Zoom: ×${zoom}`;
+    }, 20);
+  }
+
+  // ── Événements ────────────────────────────────────────────────────
+  canvas.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const px = (e.clientX - rect.left) / rect.width * W;
+    const py = (e.clientY - rect.top)  / rect.height * H;
+    const xMin = state.cx - state.range / 2;
+    const yMin = state.cy - state.range * (H / W) / 2;
+    state.cx = xMin + px * (state.range / W);
+    state.cy = yMin + py * (state.range * (H / W) / H);
+    state.range *= 0.4;
+    draw();
+  });
+
+  canvas.addEventListener('dblclick', (e) => {
+    e.preventDefault();
+    state.range = Math.min(state.range * 3, 4);
+    draw();
+  });
+
+  document.getElementById('iter').addEventListener('input', (e) => {
+    document.getElementById('iter-val').textContent = e.target.value;
+    draw();
+  });
+
+  document.getElementById('palette').addEventListener('change', draw);
+
+  document.getElementById('btn-reset').addEventListener('click', () => {
+    state = { cx: -0.5, cy: 0, range: 3.0 };
+    document.getElementById('iter').value = 100;
+    document.getElementById('iter-val').textContent = '100';
+    draw();
+  });
+
+  draw();
+</script>
+</body>
+</html>
