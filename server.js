@@ -632,5 +632,9 @@ app.get('/synthetiseur', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'synthetiseur.html'));
 });
 
+app.get('/samegame-online', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'samegame-online.html'));
+});
+
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🎮 SAME GAME → http://localhost:${PORT}`));
