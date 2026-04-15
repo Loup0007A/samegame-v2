@@ -208,12 +208,21 @@ canvas { display:block; max-width:100%; max-height:100%; border:1px solid rgba(2
 .cap-dot { width:5px; height:5px; border-radius:50%; background:#333; }
 .cap-dot.active { background:var(--secondary); }
 .cap-dot.full { background:var(--primary); }
+.seo-hidden {
+  position: absolute;
+  left: -9999px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
 </style>
 </head>
 <body>
-
+<h1 class="seo-hidden">
+  Same Game - Un jeu multijoueur où chaque joueur vit une réalité différente
+</h1>
 <div id="lobby">
-  <span class="tb-logo"><h1 style:'opacity:1.0;'>Same Game - Un jeu multijoueur où chaque joueur vit une réalité différente</h1><span>
   <div class="logo">SAME<br>GAME</div>
   <div class="tagline">Everyone plays. No one knows.</div>
   <div class="lobby-tabs">
